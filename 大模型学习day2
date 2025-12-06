@@ -1,5 +1,209 @@
-# 搭建完了LeNET全部网络
+搭建完了LeNET全部网络
 今天刚刚搭建完全部网络，现在进行一下复盘
-## 错误信息整理
+错误信息整理
 1.第一个错误信息其实还是缩进的问题（python缩进害人不浅！）
-  
+特别是代码中行171中，因为train_process缩进问题导致代码报错
+2.发现训练轮次上去后显卡算力不太够，可能以后得租个轻量级服务器，大概0.7r/h，不用的时候关机，只在训练模型的时候用，感觉也不会花多少钱🤔
+下一步计划
+1.准备开始transform的编写
+2.刷leetcode
+
+以下是本次代码
+注意，LeNET是已经编写好的LeNET网络，其机构参数已经确定，包括input以及output
+import copy
+import time
+
+from torchvision.datasets import FashionMNIST
+import numpy as np
+from torchvision import transforms
+import torch.utils.data as Data
+import matplotlib.pyplot as plt
+
+# import LeNET
+from LeNET import LeNet
+import torch
+import torch.nn as nn
+import pandas as pd
+
+#数据加载
+def train_val_data_process():
+    train_data = FashionMNIST(root='./data',
+                              train=True,
+                              transform=transforms.Compose([transforms.Resize(size=28), transforms.ToTensor()]),
+                              download=True)
+    train_data,val_data = Data.random_split(train_data,[round(0.8*len(train_data)),round(0.2*len(train_data))])
+
+    train_dataloader = Data.DataLoader(dataset=train_data,
+                                       batch_size=32,
+                                       shuffle=True,
+                                       num_workers=6)
+
+    val_dataloader = Data.DataLoader(dataset=val_data,
+                                       batch_size=32,
+                                       shuffle=True,
+                                       num_workers=6)
+
+    return train_dataloader,val_dataloader
+
+train_dataloader,val_dataloader = train_val_data_process()
+
+#定义模型初始化值
+def train_model_process(LeNET,tran_dataloader,val_dataloader,num_epochs):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    optimizer = torch.optim.Adam(LeNET.parameters(),lr=0.001)#激活函数
+
+    criterion = nn.CrossEntropyLoss()#损失函数
+
+
+    LeNET = LeNET.to(device)#模型放入GPU
+
+    best_model_wts = copy.deepcopy(LeNET.state_dict())
+
+
+    best_acc = 0.0
+
+    train_loss_all = []
+
+    val_loss_all = []
+
+    train_acc_all = []
+
+    val_acc_all = []
+
+    since = time.time()
+
+
+    #开始进行模型的训练，并初始化参数，撰写前向传播、反向传播、梯度更新
+    for epoch in range(num_epochs):
+        print("Epoch{}/{}".format(epoch,num_epochs-1))#从0开始训练所以需要减去一
+        print("-"*10)
+
+        #初始化参数
+        train_loss = 0.0
+        train_corrects = 0
+
+        val_loss = 0.0
+        val_corrects = 0
+
+        #训练集及验证集样本数量
+        train_num = 0
+        val_num = 0
+
+
+        #取数据,
+        for step,(b_x,b_y) in enumerate(train_dataloader):
+            #放进GPU中
+            b_x = b_x.to(device)
+            b_y = b_y.to(device)
+
+            LeNET.train()#开启模型训练模式
+
+            #前向传播，对输入的batch进行测试，输出对应batch的预测值
+            output = LeNET(b_x)
+
+            pre_lab = torch.argmax(output,dim=1)
+            #计算每个batch的损失
+            loss = criterion(output,b_y)
+
+            # 将梯度置为 0 更新参数，并且反向传播
+            optimizer.zero_grad()
+            #反向传播
+            loss.backward()
+            #参数更新
+            optimizer.step()
+
+            train_loss += loss.item()*b_x.size(0)#每个样本的平均loss值，其实就是一个batch_size里面，假如我捆128张图片进来，一个图片loss值0.001，那么这个batch_size里面loss总共就是0.1，但是一个完整轮次需要训练大约12800张图，所以总的轮次loss就是所有batch_size loss相加在除以总的轮次图12800即可得到一个轮次的loss值
+            #预测正确的话，正确值+1
+            train_corrects += torch.sum(pre_lab == b_y.data)
+
+            train_num += b_x.size(0) #训练样本的总数量，一个轮次
+
+        for step,(b_x,b_y) in enumerate(val_dataloader):
+            #放进GPU中
+            b_x = b_x.to(device)
+
+            b_y = b_y.to(device)
+
+            LeNET.eval()#模型开启验证模式
+
+
+            output = LeNET(b_x)
+
+            pre_lab = torch.argmax(output, dim=1)
+
+            loss = criterion(output, b_y)
+
+            val_loss += loss.item() * b_x.size(0)
+            # 预测正确的话，正确值+1
+            val_corrects += torch.sum(pre_lab == b_y.data)
+
+            val_num += b_x.size(0)
+
+        # 一个epoch的loss值
+        train_loss_all.append(train_loss/train_num)
+        train_acc_all.append(train_corrects.double().item()/train_num)
+        # 一个epoch的loss值
+        val_loss_all.append(val_loss / val_num)
+        val_acc_all.append(val_corrects.double().item() / val_num)
+
+
+        print('{} Train Loss: {:.4f} Train ACC:{:.4f}'.format(epoch,train_loss_all[-1],train_acc_all[-1]))
+        print('{} Val Loss: {:.4f} Val ACC:{:.4f}'.format(epoch, val_loss_all[-1], val_acc_all[-1]))
+
+        if val_acc_all[-1] > best_acc:
+
+            best_acc = val_acc_all[-1]
+
+            best_model_wts = copy.deepcopy(LeNET.state_dict())
+
+
+        #计算训练耗时
+        time_use = time.time()-since
+        print("训练和验证耗费的时间{:.0f}m{:.0f}s".format(time_use // 60,time_use%60))
+
+
+    #选择最优参数
+    #加载最高准确率下的模型参数
+    LeNET.load_state_dict(best_model_wts)
+    #保存参数及权重
+    torch.save(LeNET.load_state_dict(best_model_wts),'best_model.pth')#这个里面包含模型结构和参数,一般为dataframe
+
+    train_process = pd.DataFrame(data = {"epoch":range(num_epochs),
+                                         "train_loss_all":train_loss_all,
+                                         "val_loss_all":train_loss_all,
+                                         "train_acc_all": train_loss_all,
+                                         "val_acc_all": train_loss_all,
+                                          })
+
+    return train_process
+
+
+
+
+def matplot_acc_loss(train_process):
+    plt.figure(figsize = (12,4))
+    plt.subplot(1,2,1)#其实就是类比matlab，还挺容易理解的
+    plt.plot(train_process["epoch"],train_process.train_loss_all,'ro-',label ="train loss")
+    plt.plot(train_process["epoch"], train_process.val_loss_all, 'bs-', label="val loss")
+    plt.legend()
+    plt.xlabel("epoch")
+    plt.ylabel("loss")
+
+    
+    plt.subplot(1, 2, 2)  # 其实就是类比matlab，还挺容易理解的
+    plt.plot(train_process["epoch"], train_process.train_acc_all, 'ro-', label="train acc")
+    plt.plot(train_process["epoch"], train_process.val_acc_all, 'bs-', label="val acc")
+    plt.legend()
+    plt.xlabel("epoch")
+    plt.ylabel("acc")
+    plt.legend()
+    plt.show()
+
+
+if __name__ == "__main__":
+    #模型实例化
+    LeNet = LeNet()
+    train_dataloader,val_dataloader = train_val_data_process()
+    train_process=train_model_process(LeNet, train_dataloader, val_dataloader, 20)
+    matplot_acc_loss(train_process)
