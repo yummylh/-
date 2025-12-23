@@ -1,4 +1,4 @@
-# 📅 [2025.12.22] 学习笔记：[leetcode刷题以及RAG优化]
+# 📅 [2025.12.23] 学习笔记：[leetcode刷题以及RAG优化]
 ## 🎯 学习目标
 - [x] 做了leetcode的四道题
 - [x] 成功实现了本地化部署LLAMA
@@ -185,6 +185,6 @@ class Solution(object):
 
 ### 3.agent进展
 今天加入本地化部署了agent模型，是Llama 3.1版本，与调API接口来比较，弊端还是挺多的，因为他的参数没有那么多，所以回答表现效果不是很好，正因为表现不好，才是RAG进行微调处理的时机。
-![agent图片]()
+![agent图片](image/LLAMA.jpg)
 # to ❀
 我恨项目！！！！
