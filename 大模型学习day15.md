@@ -54,10 +54,10 @@ class Solution:
         if l2: curr.next = l2
         
         return dummy.next    
-        ```
+ ```
 
 ### 3.agent进展
 我只能说，本来下午很早就能完成的东西，结果电脑死了，execl没保存，自己构建的数据集，评价指标全没了，又重头来过
-![数据图]()
+![数据图](image/LLAMA_evolution.jpg)
 # to ❀
 虽然晚上很冷！但是一起吃好吃的开心！再坚持明天一天！后天就能粗去玩啦！
